@@ -53,13 +53,17 @@ from utils.overage import (
     get_user_overage,
     is_overage_plan,
 )
+from utils.auth_middleware import require_firebase, require_firebase_no_byok
 from utils.log_sanitizer import sanitize
 import os
 import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+_public_router = APIRouter()
+_skip_byok_router = APIRouter(dependencies=[Depends(require_firebase_no_byok)])
+_firebase_router = APIRouter(dependencies=[Depends(require_firebase)])
+_custom_router = APIRouter()
 
 
 class CreateCheckoutRequest(BaseModel):
@@ -187,7 +191,7 @@ def _try_reactivate_subscription(uid: str, target_price_id: str) -> dict | None:
     return None
 
 
-@router.get('/v1/payments/available-plans', response_model=AvailablePlansResponse)
+@_skip_byok_router.get('/v1/payments/available-plans', response_model=AvailablePlansResponse)
 def get_available_plans_endpoint(
     request: Request,
     # Payment / plan surfaces must stay reachable even if BYOK fingerprints
@@ -343,7 +347,7 @@ class OverageInfoResponse(BaseModel):
     byok_available: bool = True
 
 
-@router.get('/v1/payments/overage-info', response_model=OverageInfoResponse)
+@_skip_byok_router.get('/v1/payments/overage-info', response_model=OverageInfoResponse)
 def get_overage_info_endpoint(request: Request):
     uid = request.state.uid
     """Explain overage billing + return the user's current accrued charge.
@@ -375,7 +379,7 @@ def get_overage_info_endpoint(request: Request):
     )
 
 
-@router.post('/v1/payments/checkout-session')
+@_firebase_router.post('/v1/payments/checkout-session')
 def create_checkout_session_endpoint(request: Request, data: CreateCheckoutRequest):
     # Check if user can make a new payment
     uid = request.state.uid
@@ -399,7 +403,7 @@ def create_checkout_session_endpoint(request: Request, data: CreateCheckoutReque
     return {"url": session.url, "session_id": session.id}
 
 
-@router.post('/v1/payments/upgrade-subscription')
+@_firebase_router.post('/v1/payments/upgrade-subscription')
 def upgrade_subscription_endpoint(request: Request, data: UpgradeSubscriptionRequest):
     uid = request.state.uid
     """Upgrade or change a user's subscription plan.
@@ -525,7 +529,7 @@ class CancelSubscriptionRequest(BaseModel):
     reason_details: Optional[str] = None
 
 
-@router.delete('/v1/payments/subscription')
+@_firebase_router.delete('/v1/payments/subscription')
 def cancel_subscription_endpoint(request: Request, data: CancelSubscriptionRequest = CancelSubscriptionRequest()):
     uid = request.state.uid
     subscription = users_db.get_user_subscription(uid)
@@ -590,7 +594,7 @@ def cancel_subscription_endpoint(request: Request, data: CancelSubscriptionReque
         raise HTTPException(status_code=500, detail="Could not cancel subscription. Please try again.")
 
 
-@router.post('/v1/stripe/webhook', tags=['v1', 'stripe', 'webhook'])
+@_custom_router.post('/v1/stripe/webhook', tags=['v1', 'stripe', 'webhook'])
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
     payload = await request.body()
 
@@ -822,7 +826,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     return {"status": "success"}
 
 
-@router.post('/v1/stripe/connect/webhook', tags=['v1', 'stripe', 'webhook'])
+@_custom_router.post('/v1/stripe/connect/webhook', tags=['v1', 'stripe', 'webhook'])
 async def stripe_webhook(request: Request, stripe_signature: str = Header(None)):
     payload = await request.body()
 
@@ -849,7 +853,7 @@ async def stripe_webhook(request: Request, stripe_signature: str = Header(None))
     return {"status": "success"}
 
 
-@router.post("/v1/stripe/connect-accounts")
+@_firebase_router.post("/v1/stripe/connect-accounts")
 async def create_connect_account_endpoint(request: Request, country: str | None = Query(default=None)):
     uid = request.state.uid
     """
@@ -871,12 +875,12 @@ async def create_connect_account_endpoint(request: Request, country: str | None 
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get('/v1/stripe/supported-countries')
+@_public_router.get('/v1/stripe/supported-countries')
 def get_supported_countries():
     return stripe_utils.get_supported_countries()
 
 
-@router.get("/v1/stripe/onboarded", tags=['v1', 'stripe'])
+@_firebase_router.get("/v1/stripe/onboarded", tags=['v1', 'stripe'])
 async def check_onboarding_status(request: Request):
     uid = request.state.uid
     """
@@ -891,7 +895,7 @@ async def check_onboarding_status(request: Request):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.post("/v1/stripe/refresh/{account_id}")
+@_custom_router.post("/v1/stripe/refresh/{account_id}")
 async def refresh_account_link_endpoint(request: Request, account_id: str):
     """
     Generate a fresh account link if the previous one expired
@@ -903,7 +907,7 @@ async def refresh_account_link_endpoint(request: Request, account_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/v1/stripe/return/{account_id}", response_class=HTMLResponse)
+@_public_router.get("/v1/stripe/return/{account_id}", response_class=HTMLResponse)
 async def stripe_return(account_id: str):
     """
     Handle the return flow from Stripe Connect account creation
@@ -971,7 +975,7 @@ async def stripe_return(account_id: str):
     return HTMLResponse(content=html_content)
 
 
-@router.post("/v1/paypal/payment-details")
+@_firebase_router.post("/v1/paypal/payment-details")
 def save_paypal_payment_details(request: Request, data: dict):
     uid = request.state.uid
     """
@@ -993,7 +997,7 @@ def save_paypal_payment_details(request: Request, data: dict):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/v1/paypal/payment-details")
+@_firebase_router.get("/v1/paypal/payment-details")
 def get_paypal_payment_details_endpoint(request: Request):
     uid = request.state.uid
     """
@@ -1006,7 +1010,7 @@ def get_paypal_payment_details_endpoint(request: Request):
     return details
 
 
-@router.get("/v1/payments/success", response_class=HTMLResponse)
+@_public_router.get("/v1/payments/success", response_class=HTMLResponse)
 async def stripe_success(session_id: str = Query(...)):
     # The subscription is updated via webhook. This page is just for user feedback.
     return HTMLResponse(content="""
@@ -1020,7 +1024,7 @@ async def stripe_success(session_id: str = Query(...)):
     """)
 
 
-@router.get("/v1/payments/cancel", response_class=HTMLResponse)
+@_public_router.get("/v1/payments/cancel", response_class=HTMLResponse)
 async def stripe_cancel():
     return HTMLResponse(content="""
         <html>
@@ -1033,7 +1037,7 @@ async def stripe_cancel():
     """)
 
 
-@router.post('/v1/payments/customer-portal')
+@_firebase_router.post('/v1/payments/customer-portal')
 def create_customer_portal_endpoint(request: Request):
     uid = request.state.uid
     """Create a Stripe Customer Portal session for managing payment methods and subscriptions."""
@@ -1059,7 +1063,7 @@ def create_customer_portal_endpoint(request: Request):
     return {"url": portal_session.url}
 
 
-@router.get("/v1/payments/portal-return", response_class=HTMLResponse)
+@_public_router.get("/v1/payments/portal-return", response_class=HTMLResponse)
 async def portal_return():
     return HTMLResponse(content="""
         <html>
@@ -1072,7 +1076,7 @@ async def portal_return():
     """)
 
 
-@router.get("/v1/payment-methods/status")
+@_firebase_router.get("/v1/payment-methods/status")
 def get_payment_method_status(request: Request):
     uid = request.state.uid
     """Get the statuses of the payment methods for the user"""
@@ -1090,7 +1094,7 @@ def get_payment_method_status(request: Request):
     return {"stripe": stripe_status, "paypal": paypal_status, "default": default_payment_method}
 
 
-@router.post("/v1/payment-methods/default")
+@_firebase_router.post("/v1/payment-methods/default")
 def set_default_payment_method_endpoint(request: Request, data: dict):
     uid = request.state.uid
     """Set the default payment method for the user"""
@@ -1101,7 +1105,7 @@ def set_default_payment_method_endpoint(request: Request, data: dict):
     return {"status": "success"}
 
 
-@router.get("/v1/apps/{app_id}/subscription")
+@_firebase_router.get("/v1/apps/{app_id}/subscription")
 def get_app_subscription(request: Request, app_id: str):
     uid = request.state.uid
     """Get user's subscription for a specific app"""
@@ -1135,7 +1139,7 @@ def get_app_subscription(request: Request, app_id: str):
         raise HTTPException(status_code=500, detail="Could not retrieve subscription information")
 
 
-@router.delete("/v1/apps/{app_id}/subscription")
+@_firebase_router.delete("/v1/apps/{app_id}/subscription")
 def cancel_app_subscription(request: Request, app_id: str):
     uid = request.state.uid
     """Cancel user's subscription for a specific app"""
@@ -1171,3 +1175,10 @@ def cancel_app_subscription(request: Request, app_id: str):
     except Exception as e:
         logger.error(f"Error canceling app subscription: {e}")
         raise HTTPException(status_code=500, detail="Could not cancel subscription")
+
+
+router = APIRouter()
+router.include_router(_public_router)
+router.include_router(_skip_byok_router)
+router.include_router(_firebase_router)
+router.include_router(_custom_router)
