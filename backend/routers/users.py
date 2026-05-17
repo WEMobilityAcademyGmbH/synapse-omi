@@ -1096,9 +1096,9 @@ class PaywallStatusResponse(BaseModel):
     paywalled: bool
 
 
-@router.get('/v1/users/me/paywall', tags=['users'], response_model=PaywallStatusResponse)
+@_firebase_router.get('/v1/users/me/paywall', tags=['users'], response_model=PaywallStatusResponse)
 def get_user_paywall_status(
-    uid: str = Depends(auth.get_current_user_uid),
+    request: Request,
     x_app_platform: Optional[str] = Header(None, alias='X-App-Platform'),
     platform: Optional[str] = Query(None),
 ):
@@ -1113,12 +1113,13 @@ def get_user_paywall_status(
     Platform comes from `X-App-Platform` header (preferred) or `platform`
     query param (fallback). Unknown / missing platforms are never paywalled.
     """
+    uid = request.state.uid
     resolved_platform = x_app_platform or platform
     return PaywallStatusResponse(paywalled=is_trial_paywalled(uid, resolved_platform))
 
 
-@router.get('/v1/users/me/trial', tags=['users'], response_model=TrialMetadata)
-def get_user_trial_status(uid: str = Depends(auth.get_current_user_uid)):
+@_firebase_router.get('/v1/users/me/trial', tags=['users'], response_model=TrialMetadata)
+def get_user_trial_status(request: Request):
     """Structured trial metadata for the calling user.
 
     Returns trial timing info (start, end, remaining seconds, expired flag)
@@ -1129,6 +1130,7 @@ def get_user_trial_status(uid: str = Depends(auth.get_current_user_uid)):
     Paid-plan and BYOK users get `trial_expired=False` with zeroed timing
     (trial is irrelevant to them — they have full access).
     """
+    uid = request.state.uid
     return get_trial_metadata(uid)
 
 
