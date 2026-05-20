@@ -43,7 +43,7 @@ Tracks: N-062 (Meeting-Recorder) parent L1-0376 / leaf L3-0650.
 | Cleanup-Provider-Abstraktion | `backend/cleanup_providers/` *(new)* | L1-0376 AC | Plugin interface: `local-haiku` (Hetzner/Mac), `anthropic-haiku-api`, `anthropic-sonnet-api`, `openai-gpt-mini-api`. Per-user / per-tenant config. Re-used by N-063 coaching + N-064 business-call classifier. |
 | Capture-Event-Bus emitter | `backend/bus/capture_emitter.py` *(new)* | L1-0374 | Emits transcript chunks via Postgres-Outbox to the SYNAPSE Capture-Event-Bus (ADR-063 / D-0137). Schema: `libs/synapse-common/capture_event.py`. |
 | Faster-Whisper streaming layer | `backend/asr/faster_whisper_stream.py` *(new)* | L1-0376 | Replaces OMI's Deepgram-default with a self-hosted faster-whisper path; Deepgram path stays available as fallback provider. |
-| Hetzner deploy bundle | `deploy/Dockerfile`, `deploy/docker-compose.snippet.yml` *(new)* | L3-0650 | Single-image Compose service `synapse-omi` on port 8030, mounts model cache, picks up bus DSN from env. |
+| Hetzner deploy bundle | `deploy/Dockerfile`, `deploy/docker-compose.snippet.yml` *(new)* | L3-0650 | Single-image Compose service `synapse-omi` on port 8031 (8030 is taken by `tenants/claim/8030-taric` in the SYNAPSE registry), mounts model cache, picks up bus DSN from env. |
 | `LICENSE-NOTICE.md` | `LICENSE-NOTICE.md` *(new)* | L3-0650 | Records fork lineage + maintainer + scope of additions. |
 | `Re-Use-Map.md` | `Re-Use-Map.md` *(new — this file)* | L3-0650 | Canonical mapping. Mirrored at `omi-fork/Re-Use-Map.md` in SYNAPSE monorepo. |
 

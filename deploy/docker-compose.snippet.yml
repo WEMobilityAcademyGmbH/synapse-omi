@@ -1,0 +1,46 @@
+# Compose snippet for the Hetzner deploy of synapse-omi (L3-0650).
+#
+# Merge into the SYNAPSE root `docker-compose.yml` (or include via
+# `docker compose -f docker-compose.yml -f deploy/docker-compose.snippet.yml up`).
+#
+# Network `synapse_default` is the existing external network used by the rest
+# of the SYNAPSE stack. The service expects:
+#   * BUS_DSN   — Postgres DSN of the Capture-Event-Bus (D-0137).
+#   * CLEANUP_PROVIDER — one of `local-haiku | anthropic-haiku-api |
+#                       anthropic-sonnet-api | openai-gpt-mini-api`.
+#   * Model cache mount so faster-whisper weights survive container restarts.
+
+services:
+  synapse-omi:
+    build:
+      context: ..              # synapse-omi repo root
+      dockerfile: deploy/Dockerfile
+    image: synapse-omi:local
+    container_name: synapse-omi
+    restart: unless-stopped
+    ports:
+      - "8031:8031"            # 8030 belegt durch tenants/claim/8030-taric
+    environment:
+      SYNAPSE_OMI_PORT: "8031"
+      BUS_DSN: "${BUS_DSN:?BUS_DSN required — capture-event bus DSN}"
+      CLEANUP_PROVIDER: "${CLEANUP_PROVIDER:-local-haiku}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY:-}"
+      OPENAI_API_KEY: "${OPENAI_API_KEY:-}"
+      WHISPER_MODEL: "${WHISPER_MODEL:-large-v3}"
+    volumes:
+      - omi_model_cache:/root/.cache
+    networks:
+      - synapse_default
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8031/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  omi_model_cache:
+
+networks:
+  synapse_default:
+    external: true
