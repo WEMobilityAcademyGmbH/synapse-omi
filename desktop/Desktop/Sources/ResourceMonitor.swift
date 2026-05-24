@@ -158,16 +158,9 @@ class ResourceMonitor {
       components["videoEncoder_oldestFrameAgeSec"] = Int(age)
     }
 
-    // FocusAssistant pending tasks (actor — await, optional since it may not be initialized)
-    if let focusAssistant = ProactiveAssistantsPlugin.shared.currentFocusAssistant {
-      components["focus_pendingTasks"] = await focusAssistant.pendingTasksCount
-      components["focus_historyCount"] = await focusAssistant.analysisHistoryCount
-    }
-
-    // Rewind backpressure stats (MainActor — direct access)
-    let plugin = ProactiveAssistantsPlugin.shared
-    components["rewind_droppedFrames"] = plugin.droppedFrameCount
-    components["rewind_isProcessing"] = plugin.isProcessingRewindFrame
+    // FocusAssistant + Rewind monitoring stripped (Phase 2.1 — desktop-strip).
+    // Counters intentionally omitted from the resource report.
+    _ = ProactiveAssistantsPlugin.shared.isMonitoring
 
     // Thread count is already in snapshot
     components["threadCount"] = snapshot.threadCount
@@ -355,10 +348,7 @@ class ResourceMonitor {
       // Flush VideoChunkEncoder and await completion
       _ = try? await VideoChunkEncoder.shared.flushCurrentChunk()
 
-      // Clear focus assistant pending tasks specifically
-      if let focusAssistant = ProactiveAssistantsPlugin.shared.currentFocusAssistant {
-        await focusAssistant.clearPendingWork()
-      }
+      // FocusAssistant stripped — no pending work to clear.
 
       // Pause AgentSync to reduce memory pressure and resume after 60s
       await AgentSyncService.shared.pause()
