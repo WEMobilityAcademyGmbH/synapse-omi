@@ -75,6 +75,13 @@ abstract class Env {
   static bool get useWebAuth => _instance.useWebAuth ?? false;
 
   static bool get useAuthCustomToken => _instance.useAuthCustomToken ?? false;
+
+  /// Dev-only: when true, surface a "Continue as Guest" button on the
+  /// Auth-Wall that bypasses Firebase Apple/Google sign-in for local
+  /// smoke-tests against the stub backend. Compile-time gated via
+  /// envied so production builds (prod_env) cannot toggle it on at
+  /// runtime. Default: false.
+  static bool get devBypassAuth => _instance.devBypassAuth ?? false;
 }
 
 abstract class EnvFields {
@@ -103,4 +110,6 @@ abstract class EnvFields {
   bool? get useAuthCustomToken;
 
   String? get stagingApiUrl;
+
+  bool? get devBypassAuth;
 }

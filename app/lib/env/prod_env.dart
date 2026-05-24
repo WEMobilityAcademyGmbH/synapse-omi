@@ -59,4 +59,9 @@ final class ProdEnv implements EnvFields {
   @override
   @EnviedField(varName: 'STAGING_API_URL', obfuscate: true)
   final String? stagingApiUrl = _ProdEnv.stagingApiUrl;
+
+  /// Production hard-codes devBypassAuth=false. No env-var lookup —
+  /// the dev-auth-bypass code-path is unreachable in prod builds.
+  @override
+  final bool? devBypassAuth = false;
 }
