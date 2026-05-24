@@ -607,6 +607,20 @@ class SharedPreferencesUtil {
 
   bool get testFlightUseStagingApi => testFlightApiEnvironment == 'staging';
 
+  //------------------------ Custom Backend URL Override ---------------------//
+
+  /// Custom API base URL (atwenture-fork). When non-empty, overrides
+  /// the compile-time API_BASE_URL from .dev.env at app boot. Used by the
+  /// developer-mode "Custom Backend URL" form (lib/pages/onboarding/custom_auth/
+  /// backend_url.dart). Must end with '/' (validated in the form).
+  /// Empty string = no override = use compile-time default.
+  String get customBackendUrl => getString('customBackendUrl');
+
+  set customBackendUrl(String value) => saveString('customBackendUrl', value);
+
+  /// Convenience: true if a non-empty override is set.
+  bool get hasCustomBackendUrl => customBackendUrl.isNotEmpty;
+
   //--------------------------- Announcements ---------------------------------//
 
   // Last known app version - used to detect app upgrades

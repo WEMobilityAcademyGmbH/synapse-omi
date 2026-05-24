@@ -148,6 +148,16 @@ Future _init() async {
 
   await SharedPreferencesUtil.init();
 
+  // Custom backend URL override (atwenture-fork) — must be FIRST after
+  // SharedPreferencesUtil.init() so subsequent code (incl. TestFlight + auth)
+  // sees the swapped Env.apiBaseUrl. Set via the developer-mode
+  // CustomBackendURLForm in lib/pages/onboarding/custom_auth/backend_url.dart.
+  if (SharedPreferencesUtil().hasCustomBackendUrl) {
+    final customUrl = SharedPreferencesUtil().customBackendUrl;
+    Env.overrideApiBaseUrl(customUrl);
+    debugPrint('Custom backend URL active: $customUrl');
+  }
+
   // TestFlight environment detection — must be after SharedPreferencesUtil.init()
   if (F.env == Environment.prod) {
     final isTestFlight = await EnvironmentDetector.isTestFlight();
