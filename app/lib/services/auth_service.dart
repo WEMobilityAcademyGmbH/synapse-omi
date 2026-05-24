@@ -25,10 +25,47 @@ class AuthService {
 
   AuthService._internal();
 
-  bool isSignedIn() => FirebaseAuth.instance.currentUser != null && !FirebaseAuth.instance.currentUser!.isAnonymous;
+  bool isSignedIn() {
+    final firebaseUser = FirebaseAuth.instance.currentUser;
+    if (firebaseUser != null && !firebaseUser.isAnonymous) return true;
+    // Dev-bypass: a long-lived stub token written by AuthenticationProvider
+    // .onDevBypassSignIn() acts as a stand-in Firebase session for local
+    // smoke-testing against the stub backend (DEV_BYPASS_AUTH flag).
+    final token = SharedPreferencesUtil().authToken;
+    if (token.isNotEmpty && token.startsWith('dev-bypass-')) return true;
+    return false;
+  }
 
   getFirebaseUser() {
     return FirebaseAuth.instance.currentUser;
+  }
+
+  /// Null-safe accessor for the current Firebase user's email.
+  /// Falls back to SharedPreferences when no Firebase user is present
+  /// (e.g. dev-bypass flow).
+  static String? safeUserEmail() {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u != null) return u.email;
+    final cached = SharedPreferencesUtil().email;
+    return cached.isEmpty ? null : cached;
+  }
+
+  /// Null-safe accessor for displayName with SharedPrefs fallback.
+  static String? safeUserDisplayName() {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u != null) return u.displayName;
+    final given = SharedPreferencesUtil().givenName;
+    final family = SharedPreferencesUtil().familyName;
+    final combined = '$given $family'.trim();
+    return combined.isEmpty ? null : combined;
+  }
+
+  /// Null-safe accessor for uid with SharedPrefs fallback.
+  static String? safeUserUid() {
+    final u = FirebaseAuth.instance.currentUser;
+    if (u != null) return u.uid;
+    final cached = SharedPreferencesUtil().uid;
+    return cached.isEmpty ? null : cached;
   }
 
   /// Google Sign In using the standard google_sign_in package (iOS, Android)
@@ -171,7 +208,11 @@ class AuthService {
       }
       IdTokenResult? newToken = await FirebaseAuth.instance.currentUser?.getIdTokenResult(true);
       if (newToken?.token != null) {
-        var user = FirebaseAuth.instance.currentUser!;
+        final user = FirebaseAuth.instance.currentUser;
+        if (user == null) {
+          Logger.debug('getIdToken: currentUser became null mid-refresh');
+          return null;
+        }
         SharedPreferencesUtil().uid = user.uid;
         SharedPreferencesUtil().tokenExpirationTime = newToken?.expirationTime?.millisecondsSinceEpoch ?? 0;
         SharedPreferencesUtil().authToken = newToken?.token ?? '';

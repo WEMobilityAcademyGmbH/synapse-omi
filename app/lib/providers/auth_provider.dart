@@ -165,16 +165,16 @@ class AuthenticationProvider extends BaseProvider {
     String? token = await _getIdToken();
 
     if (token != null) {
-      User user;
-      try {
-        user = FirebaseAuth.instance.currentUser!;
-      } catch (e, stackTrace) {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
         AppSnackbar.showSnackbarError(
           globalNavigatorKey.currentContext?.l10n.authUnexpectedErrorFirebase ??
               'Unexpected error signing in, Firebase error, please try again.',
         );
-
-        PlatformManager.instance.crashReporter.reportCrash(e, stackTrace);
+        PlatformManager.instance.crashReporter.reportCrash(
+          StateError('FirebaseAuth.currentUser null after successful token retrieval'),
+          StackTrace.current,
+        );
         return;
       }
       String newUid = user.uid;
