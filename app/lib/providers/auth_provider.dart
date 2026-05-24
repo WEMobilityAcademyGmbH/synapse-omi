@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
@@ -185,6 +186,50 @@ class AuthenticationProvider extends BaseProvider {
       AppSnackbar.showSnackbarError(
         globalNavigatorKey.currentContext?.l10n.authUnexpectedError ?? 'Unexpected error signing in, please try again',
       );
+    }
+  }
+
+  /// Dev-only: bypass Firebase Apple/Google sign-in by writing a
+  /// stub session into SharedPreferences. Gated at the call site by
+  /// [Env.devBypassAuth]; this method itself does not re-check the
+  /// flag so it stays trivially unit-testable.
+  ///
+  /// The fake token is prefixed 'dev-bypass-' which is the marker
+  /// [AuthService.isSignedIn] looks for to treat the session as
+  /// authenticated even without a FirebaseAuth.currentUser.
+  Future<void> onDevBypassSignIn(VoidCallback onSignIn) async {
+    if (loading) return;
+    setLoadingState(true);
+    try {
+      final rnd = Random.secure();
+      String hex(int bytes) => List.generate(
+            bytes,
+            (_) => rnd.nextInt(256).toRadixString(16).padLeft(2, '0'),
+          ).join();
+
+      final fakeUid = 'dev-stub-user-${hex(4)}'; // 8 hex chars
+      // Token >= 32 chars so the stub backend's "Token too short" gate passes.
+      // 'dev-bypass-token-no-firebase-' is 29 chars; append 16 hex = 32 hex
+      // suffix → 61 chars total. Easily over the threshold.
+      final fakeToken = 'dev-bypass-token-no-firebase-${hex(16)}';
+
+      final prefs = SharedPreferencesUtil();
+      prefs.uid = fakeUid;
+      prefs.email = 'dev@atwenture.local';
+      prefs.givenName = 'Dev';
+      prefs.familyName = '';
+      prefs.authToken = fakeToken;
+      prefs.tokenExpirationTime =
+          DateTime.now().add(const Duration(days: 365)).millisecondsSinceEpoch;
+
+      authToken = fakeToken;
+      Logger.debug(
+        'DEV_BYPASS_AUTH: wrote stub session uid=$fakeUid token=${fakeToken.substring(0, 12)}…',
+      );
+      notifyListeners();
+      onSignIn();
+    } finally {
+      setLoadingState(false);
     }
   }
 
