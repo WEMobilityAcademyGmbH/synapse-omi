@@ -532,10 +532,8 @@ actor VideoChunkEncoder {
         // Only report once per app launch
         guard !Self.hasReportedFFmpegSource else { return }
         Self.hasReportedFFmpegSource = true
-
-        Task { @MainActor in
-            PostHogManager.shared.ffmpegResolved(source: source, path: path)
-        }
+        // Analytics stripped (Phase 2.1 desktop-strip) — no-op.
+        _ = (source, path)
     }
 
     // MARK: - Cleanup
