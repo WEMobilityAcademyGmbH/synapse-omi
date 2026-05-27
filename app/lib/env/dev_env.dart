@@ -59,4 +59,8 @@ final class DevEnv implements EnvFields {
   @override
   @EnviedField(varName: 'STAGING_API_URL', obfuscate: true)
   final String? stagingApiUrl = _DevEnv.stagingApiUrl;
+
+  @override
+  @EnviedField(varName: 'DEV_BYPASS_AUTH', obfuscate: false, defaultValue: false)
+  final bool? devBypassAuth = _DevEnv.devBypassAuth;
 }

@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:omi/utils/platform/platform_manager.dart';
 import 'package:flutter/material.dart';
 
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
@@ -299,10 +298,12 @@ class _OnboardingWrapperState extends State<OnboardingWrapper> with TickerProvid
       NameWidget(
         goNext: () {
           _goNext(); // Go to Primary Language page
+          // Use SharedPrefs-fallback accessors so the dev-bypass flow
+          // (no Firebase user, only cached stub credentials) does not crash.
           IntercomManager.instance.updateUser(
-            FirebaseAuth.instance.currentUser!.email,
-            FirebaseAuth.instance.currentUser!.displayName,
-            FirebaseAuth.instance.currentUser!.uid,
+            AuthService.safeUserEmail(),
+            AuthService.safeUserDisplayName(),
+            AuthService.safeUserUid(),
           );
           PlatformManager.instance.analytics.onboardingStepCompleted('Name');
         },

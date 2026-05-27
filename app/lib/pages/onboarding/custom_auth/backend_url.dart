@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
 
+import 'package:omi/backend/preferences.dart';
+import 'package:omi/env/env.dart';
 import 'package:omi/utils/l10n_extensions.dart';
 
+/// Developer-mode form to point the app at a custom backend (e.g. our
+/// atwenture-fork stub). Persists the URL in SharedPreferences and applies
+/// it as a runtime override via [Env.overrideApiBaseUrl] immediately.
+///
+/// The persisted URL is re-applied on every cold start by `main.dart` BEFORE
+/// any HTTP call — see the "custom backend URL" block in `main()`.
 class CustomBackendURLForm extends StatefulWidget {
   const CustomBackendURLForm({super.key});
 
@@ -11,7 +19,19 @@ class CustomBackendURLForm extends StatefulWidget {
 
 class _CustomBackendURLFormState extends State<CustomBackendURLForm> {
   final _formKey = GlobalKey<FormState>();
-  final _urlController = TextEditingController();
+  late final TextEditingController _urlController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Prefill with currently persisted override (empty if none) so the user
+    // can edit-in-place instead of retyping. Falls back to the compile-time
+    // default to make discovery easier.
+    final stored = SharedPreferencesUtil().customBackendUrl;
+    _urlController = TextEditingController(
+      text: stored.isNotEmpty ? stored : (Env.apiBaseUrl ?? ''),
+    );
+  }
 
   // Function to validate the URL
   String? _validateURL(String? value, BuildContext context) {
@@ -29,21 +49,41 @@ class _CustomBackendURLFormState extends State<CustomBackendURLForm> {
     if (uri == null || !uri.hasAbsolutePath || uri.scheme.isEmpty) {
       return context.l10n.invalidUrlError;
     }
+    if (uri.scheme != 'http' && uri.scheme != 'https') {
+      return context.l10n.invalidUrlError;
+    }
 
     return null;
   }
 
   void _submitForm() {
-    if (_formKey.currentState!.validate()) {
-      // Form is valid, proceed further
-      String backendURL = _urlController.text;
+    if (!_formKey.currentState!.validate()) return;
 
-      // Print or save the backend URL as needed
-      print('Custom Backend URL: $backendURL');
+    final backendURL = _urlController.text.trim();
 
-      // Show a success message
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.l10n.backendUrlSavedSuccess)));
-    }
+    // 1. Persist for next cold start.
+    SharedPreferencesUtil().customBackendUrl = backendURL;
+
+    // 2. Apply immediately so any subsequent in-session HTTP call hits the
+    //    new backend without needing to restart the app.
+    Env.overrideApiBaseUrl(backendURL);
+
+    debugPrint('[CustomBackendURLForm] Custom backend URL saved + applied: $backendURL');
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(context.l10n.backendUrlSavedSuccess)));
+  }
+
+  void _clearOverride() {
+    SharedPreferencesUtil().customBackendUrl = '';
+    _urlController.text = '';
+    // Note: Env.overrideApiBaseUrl has no "clear" — but on next cold start,
+    // the absence of a stored value means no override is applied, and the
+    // compile-time default wins again.
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Custom backend URL cleared. Restart app for full effect.')),
+    );
   }
 
   @override
@@ -93,6 +133,8 @@ class _CustomBackendURLFormState extends State<CustomBackendURLForm> {
                         ),
                         validator: (value) => _validateURL(value, context),
                         keyboardType: TextInputType.url,
+                        autocorrect: false,
+                        enableSuggestions: false,
                       ),
                       const SizedBox(height: 24),
                       SizedBox(
@@ -106,6 +148,11 @@ class _CustomBackendURLFormState extends State<CustomBackendURLForm> {
                           ),
                           child: Text(context.l10n.saveUrlButton, style: const TextStyle(fontSize: 18.0)),
                         ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _clearOverride,
+                        child: const Text('Clear override (use default)'),
                       ),
                     ],
                   ),

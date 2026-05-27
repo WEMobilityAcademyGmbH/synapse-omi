@@ -6,6 +6,7 @@ import 'package:omi/backend/http/api/users.dart';
 import 'package:omi/backend/preferences.dart';
 import 'package:omi/app_globals.dart';
 import 'package:omi/pages/settings/language_selection_dialog.dart';
+import 'package:omi/providers/locale_provider.dart';
 import 'package:omi/providers/user_provider.dart';
 import 'package:omi/utils/logger.dart';
 
@@ -238,28 +239,35 @@ class HomeProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> updateUserPrimaryLanguage(String languageCode, {UserProvider? userProvider}) async {
-    try {
-      final success = await setUserPrimaryLanguage(languageCode);
-      if (success) {
-        userPrimaryLanguage = languageCode;
-        hasSetPrimaryLanguage = true;
-        SharedPreferencesUtil().userPrimaryLanguage = languageCode;
-        SharedPreferencesUtil().hasSetPrimaryLanguage = true;
-        PlatformManager.instance.analytics.setUserAttribute('Primary Language', languageCode);
-
-        // Backend auto-sets single_language_mode — sync local state to match
-        final singleLanguageMode = !multiLanguageSupported.contains(languageCode);
-        userProvider?.updateSingleLanguageModeLocally(singleLanguageMode);
-
-        notifyListeners();
-        return true;
-      }
-      return false;
-    } catch (e) {
-      Logger.debug('Error setting user primary language: $e');
+  Future<bool> updateUserPrimaryLanguage(
+    String languageCode, {
+    UserProvider? userProvider,
+    LocaleProvider? localeProvider,
+  }) async {
+    final success = await setUserPrimaryLanguage(languageCode);
+    if (!success) {
+      Logger.debug('setUserPrimaryLanguage backend call failed for $languageCode');
       return false;
     }
+    // Persist BEFORE any side-effects so a thrown analytics/provider call
+    // can never roll back the user's choice.
+    userPrimaryLanguage = languageCode;
+    hasSetPrimaryLanguage = true;
+    SharedPreferencesUtil().userPrimaryLanguage = languageCode;
+    SharedPreferencesUtil().hasSetPrimaryLanguage = true;
+    notifyListeners();
+
+    try {
+      PlatformManager.instance.analytics.setUserAttribute('Primary Language', languageCode);
+      final singleLanguageMode = !multiLanguageSupported.contains(languageCode);
+      userProvider?.updateSingleLanguageModeLocally(singleLanguageMode);
+      // Bridge: sync UI locale with selected speech language so users who
+      // pick "Deutsch" in language settings actually see the German UI.
+      await localeProvider?.syncFromBackendLanguage(languageCode);
+    } catch (e) {
+      Logger.debug('updateUserPrimaryLanguage non-critical post-save error: $e');
+    }
+    return true;
   }
 
   String getLanguageName(String code) {

@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
+import 'package:omi/env/env.dart';
 import 'package:omi/providers/auth_provider.dart';
 import 'package:omi/utils/l10n_extensions.dart';
 
@@ -156,6 +157,40 @@ class _AuthComponentState extends State<AuthComponent> {
                         ],
                       ),
                     ),
+
+                    // Dev-only bypass button. Compile-time gated by
+                    // Env.devBypassAuth (false in prod_env). Styled as a
+                    // muted outline so it can never be confused with the
+                    // production Apple/Google buttons above.
+                    if (Env.devBypassAuth) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
+                        child: OutlinedButton(
+                          key: const Key('dev_bypass_auth_button'),
+                          onPressed: provider.loading
+                              ? null
+                              : () {
+                                  HapticFeedback.selectionClick();
+                                  provider.onDevBypassSignIn(widget.onSignIn);
+                                },
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white70,
+                            side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+                          ),
+                          child: const Text(
+                            'Als Gast fortfahren (Dev-Mode)',
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w500,
+                              fontFamily: 'Manrope',
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

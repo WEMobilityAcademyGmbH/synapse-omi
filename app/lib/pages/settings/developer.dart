@@ -18,6 +18,7 @@ import 'package:omi/backend/http/api/users.dart';
 import 'package:omi/backend/preferences.dart';
 import 'package:omi/env/env.dart';
 import 'package:omi/models/stt_provider.dart';
+import 'package:omi/pages/onboarding/custom_auth/backend_url.dart';
 import 'package:omi/pages/settings/conversation_timeout_dialog.dart';
 import 'package:omi/pages/settings/import_history_page.dart';
 import 'package:omi/pages/settings/transcription_settings_page.dart';
@@ -1808,6 +1809,41 @@ class _DeveloperSettingsPageState extends State<_DeveloperSettingsPageView> {
                       ),
                     ],
                   ],
+
+                  // Custom Backend URL (atwenture-fork) — always visible in Developer Mode.
+                  // Lets us point the app at a stub/custom backend (e.g. Hetzner) without
+                  // a rebuild. Persisted in SharedPreferences + applied on cold start.
+                  const SizedBox(height: 24),
+                  _buildSectionHeader(
+                    'Custom Backend URL',
+                    subtitle: SharedPreferencesUtil().hasCustomBackendUrl
+                        ? 'Active: ${SharedPreferencesUtil().customBackendUrl}'
+                        : 'No override — using compile-time default (${Env.apiBaseUrl ?? "n/a"})',
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF1C1C1E),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ListTile(
+                      leading: const Icon(Icons.link, color: Colors.white70),
+                      title: const Text('Open Custom Backend URL Form',
+                          style: TextStyle(color: Colors.white)),
+                      subtitle: const Text(
+                        'Set runtime override for API_BASE_URL. Restart for full effect.',
+                        style: TextStyle(color: Colors.white54, fontSize: 12),
+                      ),
+                      trailing: const Icon(Icons.chevron_right, color: Colors.white54),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const CustomBackendURLForm(),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
 
                   // Manual Firmware Flash (only when device connected)
                   Builder(
