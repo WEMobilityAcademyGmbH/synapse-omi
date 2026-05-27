@@ -48,6 +48,19 @@ class LocaleProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Sync app UI locale from backend `userPrimaryLanguage`.
+  /// Accepts codes like "de", "de-CH", "en-US"; maps to the base
+  /// language code if the region-specific tag is not in supportedLocales.
+  /// No-op when the language is unsupported or already active.
+  Future<void> syncFromBackendLanguage(String? languageCode) async {
+    if (languageCode == null || languageCode.isEmpty) return;
+    final base = languageCode.split(RegExp(r'[-_]'))[0].toLowerCase();
+    final supported = AppLocalizations.supportedLocales.any((l) => l.languageCode == base);
+    if (!supported) return;
+    if (_locale?.languageCode == base) return;
+    await setLocale(Locale(base));
+  }
+
   /// Get the display name for a locale.
   static String getDisplayName(Locale locale) {
     switch (locale.languageCode) {

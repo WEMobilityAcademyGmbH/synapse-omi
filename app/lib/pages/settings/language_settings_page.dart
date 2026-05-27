@@ -316,9 +316,11 @@ class _LanguageSettingsPageState extends State<LanguageSettingsPage> {
                                     });
                                     try {
                                       final userProvider = Provider.of<UserProvider>(context, listen: false);
+                                      final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
                                       final success = await homeProvider.updateUserPrimaryLanguage(
                                         entry.value,
                                         userProvider: userProvider,
+                                        localeProvider: localeProvider,
                                       );
                                       if (success) {
                                         captureProvider.onRecordProfileSettingChanged();
