@@ -202,6 +202,15 @@ class AuthService {
   Future<String?> getIdToken() async {
     try {
       if (FirebaseAuth.instance.currentUser == null) {
+        // Dev-bypass: when DEV_BYPASS_AUTH writes a stub token, treat it as a
+        // long-lived stand-in session. Don't clear it just because Firebase
+        // has no user — that breaks the bypass entirely and the app stays
+        // on the splash loader forever.
+        final cached = SharedPreferencesUtil().authToken;
+        if (cached.isNotEmpty && cached.startsWith('dev-bypass-')) {
+          Logger.debug('getIdToken: dev-bypass token kept (currentUser null but bypass active)');
+          return cached;
+        }
         Logger.debug('getIdToken: currentUser is null, clearing cached token');
         _clearCachedAuth();
         return null;
